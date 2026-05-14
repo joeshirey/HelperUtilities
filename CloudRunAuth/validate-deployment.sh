@@ -15,10 +15,10 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-info()    { echo -e "${BLUE}[INFO]${NC} $*"; }
-success() { echo -e "${GREEN}[OK]${NC} $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+info()    { printf "${BLUE}[INFO]${NC} %s\n" "$*"; }
+success() { printf "${GREEN}[OK]${NC} %s\n" "$*"; }
+warn()    { printf "${YELLOW}[WARN]${NC} %s\n" "$*"; }
+error()   { printf "${RED}[ERROR]${NC} %s\n" "$*"; exit 1; }
 
 prompt() {
   local var_name="$1"
@@ -26,11 +26,11 @@ prompt() {
   local default="${3:-}"
   if [[ -n "$default" ]]; then
     read -rp "$(echo -e "${BOLD}${prompt_text}${NC} [${default}]: ")" value
-    eval "$var_name=\"${value:-$default}\""
+    printf -v "$var_name" '%s' "${value:-$default}"
   else
     read -rp "$(echo -e "${BOLD}${prompt_text}${NC}: ")" value
     [[ -z "$value" ]] && error "A value is required."
-    eval "$var_name=\"$value\""
+    printf -v "$var_name" '%s' "$value"
   fi
 }
 
@@ -50,9 +50,9 @@ if ! command -v gcloud &>/dev/null; then
   error "gcloud CLI is not installed."
 fi
 
-GCLOUD_ACCOUNT=$(gcloud config get-value account 2>/dev/null || true)
-if [[ -z "$GCLOUD_ACCOUNT" ]]; then
-  error "gcloud is not authenticated. Run: gcloud auth login"
+if ! gcloud auth print-access-token &>/dev/null; then
+  error "gcloud is not authenticated or credentials have expired. Run: gcloud auth login"
 fi
+GCLOUD_ACCOUNT=$(gcloud config get-value account 2>/dev/null || true)
 info "Authenticated as: ${GCLOUD_ACCOUNT}"
 echo ""
