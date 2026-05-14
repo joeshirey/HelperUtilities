@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Superpowers CI Gates Cache & Docs
+.superpowers/
+docs/superpowers/
