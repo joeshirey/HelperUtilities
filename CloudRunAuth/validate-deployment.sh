@@ -141,27 +141,35 @@ else
 fi
 
 # 2. Verify 302 redirect to Google OAuth
+info "Fetching latest service URL..."
+SERVICE_URL=$(gcloud run services describe "$TEST_SERVICE_NAME" \
+  --region="$REGION" \
+  --project="$PROJECT_ID" \
+  --format='value(status.url)')
+
 info "Verifying unauthenticated request returns 302 redirect to Google Sign-In..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL" || echo "000")
 if [[ "$HTTP_CODE" -eq 302 ]]; then
   success "Service correctly returned HTTP 302 redirect!"
 else
-  error "Verification failed: Expected HTTP 302 redirect, but got HTTP $HTTP_CODE."
+  error "Verification failed: Expected HTTP 302 redirect, but got HTTP $HTTP_CODE (or connection failed)."
 fi
 
 echo ""
 success "All automated verification checks passed!"
 echo ""
 
-# Disable trap cleanup so we can handle explicit teardown confirmation
-trap - EXIT SIGINT SIGTERM
-
+# Keep traps active until user confirms decision
 if confirm "Validation complete. Delete temporary test service ($TEST_SERVICE_NAME)?"; then
   cleanup
+  trap - EXIT SIGINT SIGTERM
 else
+  trap - EXIT SIGINT SIGTERM
   echo ""
   info "Temporary service $TEST_SERVICE_NAME preserved."
-  info "To delete it later, run:"
+  info "Temporary YAML manifest $YAML_FILE preserved for inspection."
+  info "To delete the service and manifest later, run:"
   echo "  gcloud run services delete $TEST_SERVICE_NAME --region=$REGION --project=$PROJECT_ID"
+  echo "  rm -f $YAML_FILE"
   echo ""
 fi
