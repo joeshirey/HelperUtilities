@@ -239,9 +239,24 @@ gcloud run services add-iam-policy-binding <SERVICE> \
 
 ### Step 6: Verify
 
+#### Manual verification
 1. Open your Cloud Run URL. You should be redirected to Google Sign-In.
 2. Sign in with an allowed domain. You should see your app.
 3. In an incognito window, sign in with a different domain. You should get a 403.
+
+#### Automated end-to-end validation
+If you want to test this entire sidecar approach in your GCP project before touching your real application, run the automated validation harness:
+
+```bash
+./validate-deployment.sh
+```
+
+The script will:
+1. Deploy a temporary, public `hello-app` container to Cloud Run
+2. Guide you through running `setup-cloud-run-oauth.sh` against the temporary service
+3. Automatically verify that unauthenticated requests return an HTTP `302` redirect to Google OAuth and that `allUsers` has invoker permissions
+4. Clean up the temporary Cloud Run service and generated YAML files when you are done
+
 
 ---
 
