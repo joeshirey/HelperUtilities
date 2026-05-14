@@ -220,3 +220,5 @@ __marimo__/
 # Superpowers CI Gates Cache & Docs
 .superpowers/
 docs/superpowers/
+
+.local/
