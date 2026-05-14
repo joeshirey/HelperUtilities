@@ -56,3 +56,42 @@ fi
 GCLOUD_ACCOUNT=$(gcloud config get-value account 2>/dev/null || true)
 info "Authenticated as: ${GCLOUD_ACCOUNT}"
 echo ""
+
+prompt PROJECT_ID "GCP Project ID"
+prompt REGION "Cloud Run region" "us-central1"
+prompt ALLOWED_DOMAINS_INPUT "Allowed email domains (comma-separated)"
+
+TEST_SERVICE_NAME="oauth-test-${RANDOM}"
+YAML_FILE="service-${TEST_SERVICE_NAME}-oauth.yaml"
+
+cleanup() {
+  echo ""
+  info "Cleaning up temporary resources..."
+  if gcloud run services describe "$TEST_SERVICE_NAME" --region="$REGION" --project="$PROJECT_ID" &>/dev/null; then
+    gcloud run services delete "$TEST_SERVICE_NAME" --region="$REGION" --project="$PROJECT_ID" --quiet &>/dev/null || true
+    success "Deleted temporary service: $TEST_SERVICE_NAME"
+  fi
+  if [[ -f "$YAML_FILE" ]]; then
+    rm -f "$YAML_FILE"
+    success "Removed temporary YAML: $YAML_FILE"
+  fi
+}
+trap cleanup EXIT SIGINT SIGTERM
+
+echo ""
+info "Deploying temporary sample service ($TEST_SERVICE_NAME)..."
+gcloud run deploy "$TEST_SERVICE_NAME" \
+  --image="gcr.io/google-samples/hello-app:1.0" \
+  --region="$REGION" \
+  --project="$PROJECT_ID" \
+  --allow-unauthenticated \
+  --quiet
+
+SERVICE_URL=$(gcloud run services describe "$TEST_SERVICE_NAME" \
+  --region="$REGION" \
+  --project="$PROJECT_ID" \
+  --format='value(status.url)')
+
+success "Temporary service deployed successfully!"
+info "Service URL: $SERVICE_URL"
+echo ""
