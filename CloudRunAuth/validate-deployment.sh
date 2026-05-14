@@ -46,9 +46,11 @@ echo -e "${BOLD} Cloud Run OAuth Setup - End-to-End Validation${NC}"
 echo -e "${BOLD}====================================================${NC}"
 echo ""
 
-if ! command -v gcloud &>/dev/null; then
-  error "gcloud CLI is not installed."
-fi
+for cmd in gcloud curl python3; do
+  if ! command -v "$cmd" &>/dev/null; then
+    error "$cmd is required but not installed."
+  fi
+done
 
 if ! gcloud auth print-access-token &>/dev/null; then
   error "gcloud is not authenticated or credentials have expired. Run: gcloud auth login"
