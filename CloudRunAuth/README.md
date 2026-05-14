@@ -493,7 +493,9 @@ The redirect URI in your OAuth client doesn't match the callback URL. Things to 
   ```bash
   gcloud run services describe <SERVICE> --region=<REGION> --project=<PROJECT> --format='value(status.url)'
   ```
+- **Legacy vs. Deterministic URLs:** Cloud Run services often have two valid URLs: a legacy URL (`https://<service>-<hash>-uc.a.run.app`) returned by `gcloud`, and a deterministic URL (`https://<service>-<project_number>.<region>.run.app`) shown in the Cloud Console. Because `oauth2-proxy` constructs the callback URI based on the hostname in the user's browser address bar, accessing the service via the deterministic URL when only the legacy URL is registered will trigger a `redirect_uri_mismatch`. **Best practice:** Add both URLs to your OAuth client's Authorized Redirect URIs list.
 - Each Cloud Run service needs its own OAuth client with its own redirect URI
+
 
 ### Users from an allowed domain get blocked at Google's sign-in page
 
