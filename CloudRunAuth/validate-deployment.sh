@@ -119,7 +119,7 @@ fi
 
 echo ""
 # Invoke setup script directly in the same terminal
-./setup-cloud-run-oauth.sh
+"$(dirname "$0")/setup-cloud-run-oauth.sh"
 
 echo ""
 info "setup-cloud-run-oauth.sh exited. Starting automated verification..."
