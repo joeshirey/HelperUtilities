@@ -14,11 +14,11 @@ The sidecar (Approach 1) works with any language, any framework, any existing co
 
 Code-level auth (Approach 2) is simpler to deploy since it's a single container with no multi-container YAML. But you're writing auth middleware yourself, and it's framework-specific.
 
-IAP + Load Balancer (Approach 3) is the cleanest if you have a custom domain. Google manages everything. The catch is you need that domain, and the load balancer runs about $18/mo.
+IAP + Load Balancer (Approach 3) is the cleanest if you have a custom domain. Google manages everything. The catch is you need that domain, and the load balancer comes with a cost.
 
 ```
 Do you have a custom domain with DNS control?
-├── Yes --> Mind ~$18/mo for a load balancer?
+├── Yes --> Mind cost for a load balancer?
 │   ├── Yes --> Approach 1 (sidecar) or Approach 2 (code-level)
 │   └── No  --> Approach 3 (IAP + LB), fully managed
 └── No  --> Want to avoid all code changes?
