@@ -124,3 +124,44 @@ echo ""
 echo ""
 info "setup-cloud-run-oauth.sh exited. Starting automated verification..."
 echo ""
+
+# 1. Verify IAM Policy binding for allUsers
+info "Verifying IAM policy contains allUsers invoker binding..."
+IAM_POLICY=$(gcloud run services get-iam-policy "$TEST_SERVICE_NAME" --region="$REGION" --project="$PROJECT_ID" --format=json)
+if echo "$IAM_POLICY" | python3 -c "
+import json, sys
+policy = json.load(sys.stdin)
+bindings = policy.get('bindings', [])
+found = any(b.get('role') == 'roles/run.invoker' and 'allUsers' in b.get('members', []) for b in bindings)
+sys.exit(0 if found else 1)
+" &>/dev/null; then
+  success "IAM policy correctly binds allUsers to roles/run.invoker."
+else
+  warn "allUsers invoker binding not found in IAM policy."
+fi
+
+# 2. Verify 302 redirect to Google OAuth
+info "Verifying unauthenticated request returns 302 redirect to Google Sign-In..."
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL")
+if [[ "$HTTP_CODE" -eq 302 ]]; then
+  success "Service correctly returned HTTP 302 redirect!"
+else
+  error "Verification failed: Expected HTTP 302 redirect, but got HTTP $HTTP_CODE."
+fi
+
+echo ""
+success "All automated verification checks passed!"
+echo ""
+
+# Disable trap cleanup so we can handle explicit teardown confirmation
+trap - EXIT SIGINT SIGTERM
+
+if confirm "Validation complete. Delete temporary test service ($TEST_SERVICE_NAME)?"; then
+  cleanup
+else
+  echo ""
+  info "Temporary service $TEST_SERVICE_NAME preserved."
+  info "To delete it later, run:"
+  echo "  gcloud run services delete $TEST_SERVICE_NAME --region=$REGION --project=$PROJECT_ID"
+  echo ""
+fi
