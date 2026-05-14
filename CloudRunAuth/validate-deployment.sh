@@ -97,3 +97,30 @@ SERVICE_URL=$(gcloud run services describe "$TEST_SERVICE_NAME" \
 success "Temporary service deployed successfully!"
 info "Service URL: $SERVICE_URL"
 echo ""
+
+echo -e "${BOLD}====================================================${NC}"
+echo -e "${BOLD} Launching setup-cloud-run-oauth.sh${NC}"
+echo -e "${BOLD}====================================================${NC}"
+echo "When the setup script prompts you, enter the following values:"
+echo ""
+echo -e "  GCP Project ID:         ${GREEN}${PROJECT_ID}${NC}"
+echo -e "  Cloud Run service name: ${GREEN}${TEST_SERVICE_NAME}${NC}"
+echo -e "  Cloud Run region:       ${GREEN}${REGION}${NC}"
+echo -e "  Allowed email domains:  ${GREEN}${ALLOWED_DOMAINS_INPUT}${NC}"
+echo -e "  Startup probe path:     ${GREEN}/${NC}"
+echo -e "  CMD override:           ${GREEN}n${NC} (hello-app uses PORT env var)"
+echo -e "${BOLD}====================================================${NC}"
+echo ""
+
+if ! confirm "Ready to launch setup-cloud-run-oauth.sh?"; then
+  info "Validation aborted by user."
+  exit 0
+fi
+
+echo ""
+# Invoke setup script directly in the same terminal
+./setup-cloud-run-oauth.sh
+
+echo ""
+info "setup-cloud-run-oauth.sh exited. Starting automated verification..."
+echo ""
