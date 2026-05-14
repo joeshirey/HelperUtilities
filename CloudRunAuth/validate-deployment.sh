@@ -61,7 +61,7 @@ prompt PROJECT_ID "GCP Project ID"
 prompt REGION "Cloud Run region" "us-central1"
 prompt ALLOWED_DOMAINS_INPUT "Allowed email domains (comma-separated)"
 
-TEST_SERVICE_NAME="oauth-test-${RANDOM}"
+TEST_SERVICE_NAME="oauth-test-${RANDOM}-$$"
 YAML_FILE="service-${TEST_SERVICE_NAME}-oauth.yaml"
 
 cleanup() {
@@ -76,7 +76,9 @@ cleanup() {
     success "Removed temporary YAML: $YAML_FILE"
   fi
 }
-trap cleanup EXIT SIGINT SIGTERM
+trap cleanup EXIT
+trap 'exit 130' SIGINT
+trap 'exit 143' SIGTERM
 
 echo ""
 info "Deploying temporary sample service ($TEST_SERVICE_NAME)..."
