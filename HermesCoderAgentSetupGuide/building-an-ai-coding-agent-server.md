@@ -1,5 +1,13 @@
 # Building an Always-On AI Coding Agent Server with Hermes and Claude Code
 
+> **This guide has moved.** The instructions below are kept here for historical reference, but they no longer reflect the current setup process. For the latest and most complete version of this guide, head over to the dedicated repository:
+>
+> **[github.com/joeshirey/HermesCoderAgent](https://github.com/joeshirey/HermesCoderAgent)**
+>
+> That repo has significantly more detail, stays up to date, and is the single source of truth going forward. If you're setting this up for the first time, start there.
+
+---
+
 **How to turn a spare Mac into an autonomous coding coordinator that plans, delegates, and reviews code, accessible from anywhere via Telegram**
 
 ---
