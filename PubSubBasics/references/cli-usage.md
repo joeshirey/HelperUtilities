@@ -628,6 +628,9 @@ gcloud pubsub subscriptions delete SUBSCRIPTION_ID \
 
 ## 3. Schemas management
 
+> [!IMPORTANT]
+> **Default Schema Type**: Default to `avro` type schemas when a task requests a "JSON schema" or strict JSON validation, as the JSON-encoded messages will be validated against the Avro schema. The schema definition itself is written in Avro JSON format.
+
 Schema types in `gcloud` are `avro` and `protocol-buffer`. Definitions may be
 supplied inline with `--definition='...'` or from a file with
 `--definition-file=PATH`.

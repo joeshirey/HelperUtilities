@@ -195,6 +195,63 @@ Use this composite recipe when you need to provision a new schema-bound topic an
 )
 ```
 
+## Schema enforcement: "JSON" is a message encoding, not a schema type
+
+This trips up almost everyone. Google Cloud Pub/Sub has two **schema types**:
+`avro` and `protocol-buffer`. There is no `json` schema type, and
+`gcloud pubsub schemas create --type=json` will fail.
+
+When a task asks for a "JSON schema" or "strict JSON validation," it means the
+**topic validates messages with JSON encoding against an attached schema**. JSON
+is the `--message-encoding` you set on the *topic*, not the type of the schema.
+The schema definition itself is normally written in AVRO.
+
+So a request for a "strict JSON schema" breaks into two parts:
+1. A schema attached to the topic (the data contract).
+2. The topic's `schemaSettings.encoding` set to `json` (messages validated as JSON).
+
+### Correct recipe
+
+```bash
+SCHEMA="orders-schema"
+TOPIC="orders-topic"
+
+# 1. Create the schema. Type is avro; the definition is written in Avro JSON.
+gcloud pubsub schemas create "$SCHEMA" \
+  --type=avro \
+  --definition='{"type":"record","name":"Order","fields":[
+    {"name":"id","type":"string"},
+    {"name":"amount","type":"double"}
+  ]}'
+
+# 2. Create the topic and bind the schema with JSON MESSAGE ENCODING.
+#    --message-encoding=json is the part that makes it a "JSON schema".
+gcloud pubsub topics create "$TOPIC" \
+  --schema="$SCHEMA" \
+  --message-encoding=json
+
+# 3. Verify the contract: encoding must be json.
+gcloud pubsub topics describe "$TOPIC" --format="value(schemaSettings.encoding)"   # -> json
+```
+
+If a topic already exists, bind the schema and encoding with
+`gcloud pubsub topics update "$TOPIC" --schema="$SCHEMA" --message-encoding=json`.
+
+> **Default to JSON encoding** unless a task explicitly asks for binary. Reach for
+> `--message-encoding=binary` only when the requirement calls for it. Choosing
+> binary (or omitting the encoding) is the most common reason a "JSON schema"
+> requirement is scored as unmet, because the schema looks present but the
+> messages are not JSON-validated.
+
+### Troubleshooting
+
+- **"Schema is AVRO but I need JSON":** That is a category error. AVRO is the
+  schema *type*; JSON is the *message encoding*. Keep the AVRO schema and set the
+  topic's `--message-encoding=json`. Do not try to change the schema type.
+- **Encoding shows empty / BINARY:** the topic was created without
+  `--message-encoding=json` (or without `--schema`). Re-bind with
+  `gcloud pubsub topics update --schema=... --message-encoding=json`.
+
 ## Creating topics and subscriptions
 All commands below use placeholders in CAPS. Replace `TOPIC_ID`,
 `SUBSCRIPTION_ID`, `PROJECT_ID`, `ENDPOINT`, and similar tokens with concrete
@@ -304,6 +361,14 @@ gcloud pubsub topics describe TOPIC_ID \
 gcloud pubsub subscriptions describe SUBSCRIPTION_ID \
   --project=PROJECT_ID
 ```
+
+## Resource naming and verification checklist
+
+Before completing any Pub/Sub provisioning task, run through this checklist to ensure all resources match expectations:
+
+- [ ] **Verify resource names match requirements**: Cross-reference the exact names of the Schema, Topic, and Subscription in the prompt or spec. Do not assume names.
+- [ ] **Verify labels are applied**: If the prompt requests labels (e.g. `windtunnel-eval`), verify they are present on both the Topic and Subscription.
+- [ ] **Verify resource existence**: Run `describe` commands for the Schema, Topic, and Subscription and confirm the outputs show `state: ACTIVE` (for schema) and correct configurations.
 
 ## Core principles
 
