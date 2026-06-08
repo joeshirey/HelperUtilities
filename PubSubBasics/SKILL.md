@@ -156,7 +156,7 @@ Use this composite recipe when you need to provision a new schema-bound topic an
   SCHEMA_ID="SCHEMA_ID"
   SCHEMA_TYPE="avro"                 # avro or protocol-buffer
   SCHEMA_FILE="PATH_TO_SCHEMA_FILE"   # Local path to schema definition file
-  ENCODING="JSON"                    # JSON or BINARY
+  ENCODING="json"                    # json or binary
   TOPIC_ID="TOPIC_ID"
   SUBSCRIPTION_ID="SUBSCRIPTION_ID"
   ACK_DEADLINE=60                    # Acknowledgement deadline in seconds
@@ -224,7 +224,7 @@ To associate a topic with an existing schema:
 ```
 gcloud pubsub topics create TOPIC_ID \
   --schema=SCHEMA_ID \
-  --message-encoding=JSON \
+  --message-encoding=json \
   --project=PROJECT_ID \
   --quiet
 ```
