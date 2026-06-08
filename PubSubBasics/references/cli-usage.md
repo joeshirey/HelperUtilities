@@ -694,7 +694,7 @@ gcloud pubsub schemas list-revisions SCHEMA_ID \
 Validate that a definition is well-formed before creating the schema:
 
 ```
-gcloud pubsub schemas validate-definition \
+gcloud pubsub schemas validate-schema \
   --type=avro \
   --definition-file=./schemas/order.avsc \
   --project=PROJECT_ID
@@ -841,7 +841,7 @@ gcloud pubsub schemas delete-revision SCHEMA_ID@REVISION_ID \
 | List schemas | `gcloud pubsub schemas list --project=PROJECT_ID` |
 | Describe schema | `gcloud pubsub schemas describe SCHEMA_ID --project=PROJECT_ID` |
 | List revisions | `gcloud pubsub schemas list-revisions SCHEMA_ID --project=PROJECT_ID` |
-| Validate definition | `gcloud pubsub schemas validate-definition --type=avro --definition-file=PATH --project=PROJECT_ID` |
+| Validate definition | `gcloud pubsub schemas validate-schema --type=avro --definition-file=PATH --project=PROJECT_ID` |
 | Validate message | `gcloud pubsub schemas validate-message --schema-name=SCHEMA_ID --message-encoding=json --message='{...}' --project=PROJECT_ID` |
 | Commit revision | `gcloud pubsub schemas commit SCHEMA_ID --type=avro --definition-file=PATH --project=PROJECT_ID` |
 | Associate w/ topic | `gcloud pubsub topics create TOPIC_ID --schema=SCHEMA_ID --message-encoding=json --project=PROJECT_ID` |
