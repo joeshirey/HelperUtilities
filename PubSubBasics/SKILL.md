@@ -142,7 +142,60 @@ Additional notes:
   `roles/pubsub.publisher` on the dead letter topic and
   `roles/pubsub.subscriber` on the source subscription.
 
+## Composite resource deployment recipe
+
+Use this composite recipe when you need to provision a new schema-bound topic and subscription together. It orchestrates the configuration, validation, and creation of the dependent resources (Schema -> Topic -> Subscription) in a single execution block to minimize shell turns and prevent partial configurations.
+
+```bash
+# Run as a single copy-pasteable execution block
+(
+  set -e
+
+  # 1. Configuration Parameters
+  PROJECT_ID="PROJECT_ID"
+  SCHEMA_ID="SCHEMA_ID"
+  SCHEMA_TYPE="avro"                 # avro or protocol-buffer
+  SCHEMA_FILE="PATH_TO_SCHEMA_FILE"   # Local path to schema definition file
+  ENCODING="JSON"                    # JSON or BINARY
+  TOPIC_ID="TOPIC_ID"
+  SUBSCRIPTION_ID="SUBSCRIPTION_ID"
+  ACK_DEADLINE=60                    # Acknowledgement deadline in seconds
+
+  echo "=== [1/5] Validating Schema Definition ==="
+  gcloud pubsub schemas validate-definition \
+    --type="${SCHEMA_TYPE}" \
+    --definition-file="${SCHEMA_FILE}" \
+    --project="${PROJECT_ID}"
+
+  echo "=== [2/5] Creating Schema ==="
+  gcloud pubsub schemas create "${SCHEMA_ID}" \
+    --type="${SCHEMA_TYPE}" \
+    --definition-file="${SCHEMA_FILE}" \
+    --project="${PROJECT_ID}" \
+    --quiet
+
+  echo "=== [3/5] Creating Topic ==="
+  gcloud pubsub topics create "${TOPIC_ID}" \
+    --schema="${SCHEMA_ID}" \
+    --message-encoding="${ENCODING}" \
+    --project="${PROJECT_ID}" \
+    --quiet
+
+  echo "=== [4/5] Creating Subscription ==="
+  gcloud pubsub subscriptions create "${SUBSCRIPTION_ID}" \
+    --topic="${TOPIC_ID}" \
+    --ack-deadline="${ACK_DEADLINE}" \
+    --project="${PROJECT_ID}" \
+    --quiet
+
+  echo "=== [5/5] Verifying Resources ==="
+  gcloud pubsub topics describe "${TOPIC_ID}" --project="${PROJECT_ID}"
+  gcloud pubsub subscriptions describe "${SUBSCRIPTION_ID}" --project="${PROJECT_ID}"
+)
+```
+
 ## Creating topics and subscriptions
+
 
 All commands below use placeholders in CAPS. Replace `TOPIC_ID`,
 `SUBSCRIPTION_ID`, `PROJECT_ID`, `ENDPOINT`, and similar tokens with concrete
