@@ -296,6 +296,32 @@ gcloud pubsub subscriptions describe "$SUB" \
 - **`--max-delivery-attempts` omitted.** The valid range is 5 to 100. If a task
   asks for "exactly N attempts," pass that N explicitly.
 
+## Build order: schema and encoding must exist before the topic binds them
+
+Most "topic create failed" loops come from doing things out of order. Pub/Sub
+will reject a topic create that references a schema that does not exist yet, and
+you cannot add JSON encoding without an attached schema. Follow this sequence and
+verify each step before moving on:
+
+1. **Create the schema first.** `gcloud pubsub schemas create <schema> --type=AVRO --definition=...`
+   Verify: `gcloud pubsub schemas describe <schema>` succeeds.
+2. **Create the topic bound to that schema, with JSON encoding.**
+   `gcloud pubsub topics create <topic> --schema=<schema> --message-encoding=json`
+   Verify: `gcloud pubsub topics describe <topic> --format="value(schemaSettings.encoding)"` returns `JSON`.
+3. **Create the dead-letter topic** before any subscription references it.
+4. **Create the consuming subscription, then attach the dead-letter policy** to
+   that subscription: `--dead-letter-topic=<dlq> --max-delivery-attempts=5`.
+   Verify the policy is on the subscription that consumes the *source* topic.
+5. **Grant the Pub/Sub service agent IAM permissions:**
+   - `roles/pubsub.publisher` on the dead-letter topic.
+   - `roles/pubsub.subscriber` on the consuming subscription.
+   *(Note: Without these roles, dead-lettering will silently fail even if the policy is configured).*
+
+If a `topics create` call fails, do not blindly retry the same command. Read the
+error: a missing-schema or wrong-encoding error means step 1 or 2 was skipped or
+out of order. Re-running an identical create that already failed will keep
+failing.
+
 ## Creating topics and subscriptions
 All commands below use placeholders in CAPS. Replace `TOPIC_ID`,
 `SUBSCRIPTION_ID`, `PROJECT_ID`, `ENDPOINT`, and similar tokens with concrete
