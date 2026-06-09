@@ -198,7 +198,7 @@ Use this composite recipe when you need to provision a new schema-bound topic an
 ## Schema enforcement: "JSON" is a message encoding, not a schema type
 
 This trips up almost everyone. Google Cloud Pub/Sub has two **schema types**:
-`avro` and `protocol-buffer`. There is no `json` schema type, and
+`AVRO` and `PROTOCOL_BUFFER`. There is no `JSON` schema type, and
 `gcloud pubsub schemas create --type=json` will fail.
 
 When a task asks for a "JSON schema" or "strict JSON validation," it means the
@@ -208,7 +208,7 @@ The schema definition itself is normally written in AVRO.
 
 So a request for a "strict JSON schema" breaks into two parts:
 1. A schema attached to the topic (the data contract).
-2. The topic's `schemaSettings.encoding` set to `json` (messages validated as JSON).
+2. The topic's `schemaSettings.encoding` set to `JSON` (messages validated as JSON).
 
 ### Correct recipe
 
@@ -216,9 +216,9 @@ So a request for a "strict JSON schema" breaks into two parts:
 SCHEMA="orders-schema"
 TOPIC="orders-topic"
 
-# 1. Create the schema. Type is avro; the definition is written in Avro JSON.
+# 1. Create the schema. Type is AVRO; the definition is written in Avro JSON.
 gcloud pubsub schemas create "$SCHEMA" \
-  --type=avro \
+  --type=AVRO \
   --definition='{"type":"record","name":"Order","fields":[
     {"name":"id","type":"string"},
     {"name":"amount","type":"double"}
@@ -230,8 +230,8 @@ gcloud pubsub topics create "$TOPIC" \
   --schema="$SCHEMA" \
   --message-encoding=json
 
-# 3. Verify the contract: encoding must be json.
-gcloud pubsub topics describe "$TOPIC" --format="value(schemaSettings.encoding)"   # -> json
+# 3. Verify the contract: encoding must be JSON.
+gcloud pubsub topics describe "$TOPIC" --format="value(schemaSettings.encoding)"   # -> JSON
 ```
 
 If a topic already exists, bind the schema and encoding with
@@ -251,6 +251,50 @@ If a topic already exists, bind the schema and encoding with
 - **Encoding shows empty / BINARY:** the topic was created without
   `--message-encoding=json` (or without `--schema`). Re-bind with
   `gcloud pubsub topics update --schema=... --message-encoding=json`.
+
+## Dead-letter topics: the policy lives on the consuming subscription
+
+A dead-letter policy is configured on the **subscription that pulls from the main
+topic**, not on the dead-letter topic and not on a subscription of the
+dead-letter topic. Two mistakes account for almost every failure here: attaching
+the policy to the wrong subscription, and forgetting `--max-delivery-attempts`.
+
+To dead-letter after N failed deliveries:
+
+```bash
+DLQ_TOPIC="orders-dlq"
+SUB="orders-sub"          # the subscription that consumes the MAIN topic
+PROJECT="$(gcloud config get-value project)"
+
+# 1. Create the dead-letter topic.
+gcloud pubsub topics create "$DLQ_TOPIC" --project="$PROJECT"
+
+# 2. Attach the dead-letter policy to the CONSUMING subscription.
+#    --max-delivery-attempts is required; without it there is no dead-lettering.
+gcloud pubsub subscriptions update "$SUB" \
+  --project="$PROJECT" \
+  --dead-letter-topic="$DLQ_TOPIC" \
+  --max-delivery-attempts=5
+
+# 3. Verify the policy is on the right subscription.
+gcloud pubsub subscriptions describe "$SUB" \
+  --project="$PROJECT" \
+  --format="value(deadLetterPolicy.deadLetterTopic, deadLetterPolicy.maxDeliveryAttempts)"
+```
+
+> **Grant the Pub/Sub service agent IAM, or dead-lettering silently fails.** The
+> service agent `service-<project-number>@gcp-sa-pubsub.iam.gserviceaccount.com`
+> needs `roles/pubsub.publisher` on the dead-letter topic and
+> `roles/pubsub.subscriber` on the subscription. Without these, messages are
+> never forwarded to the DLQ even though the policy looks correct.
+
+### Common mistakes
+
+- **Policy on the wrong subscription.** It must be on the subscription consuming
+  the source topic. A dead-letter policy attached to a subscription of the
+  dead-letter topic does nothing useful.
+- **`--max-delivery-attempts` omitted.** The valid range is 5 to 100. If a task
+  asks for "exactly N attempts," pass that N explicitly.
 
 ## Creating topics and subscriptions
 All commands below use placeholders in CAPS. Replace `TOPIC_ID`,
