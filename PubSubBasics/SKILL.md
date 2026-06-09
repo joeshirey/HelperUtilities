@@ -197,18 +197,11 @@ Use this composite recipe when you need to provision a new schema-bound topic an
 
 ## Schema enforcement: "JSON" is a message encoding, not a schema type
 
-This trips up almost everyone. Google Cloud Pub/Sub has two **schema types**:
-`AVRO` and `PROTOCOL_BUFFER`. There is no `JSON` schema type, and
-`gcloud pubsub schemas create --type=json` will fail.
-
-When a task asks for a "JSON schema" or "strict JSON validation," it means the
-**topic validates messages with JSON encoding against an attached schema**. JSON
-is the `--message-encoding` you set on the *topic*, not the type of the schema.
-The schema definition itself is normally written in AVRO.
-
-So a request for a "strict JSON schema" breaks into two parts:
-1. A schema attached to the topic (the data contract).
-2. The topic's `schemaSettings.encoding` set to `JSON` (messages validated as JSON).
+Pub/Sub has two schema TYPES: `AVRO` and `PROTOCOL_BUFFER`. There is no JSON
+schema type, and `gcloud pubsub schemas create --type=json` fails. A request for
+a "JSON schema" means: attach a schema to the topic AND set the topic's message
+encoding to JSON (`--message-encoding=json`). The schema definition is normally
+written in AVRO; JSON refers only to how messages on the topic are encoded.
 
 ### Correct recipe
 
@@ -252,75 +245,46 @@ If a topic already exists, bind the schema and encoding with
   `--message-encoding=json` (or without `--schema`). Re-bind with
   `gcloud pubsub topics update --schema=... --message-encoding=json`.
 
+## Build order: schema before topic, then verify
+
+1. Create the schema first:
+   `gcloud pubsub schemas create <schema> --type=AVRO --definition='<avro-json>'`
+2. Create the topic bound to that schema with JSON encoding:
+   `gcloud pubsub topics create <topic> --schema=<schema> --message-encoding=json`
+3. Create the dead-letter topic before any subscription references it.
+4. Create the consuming subscription, then attach the dead-letter policy to it.
+
+If a `topics create` fails, read the error before retrying. A missing-schema or
+encoding error means step 1 or 2 was skipped or out of order; re-running the same
+failing command will keep failing.
+
+## Verify each resource actually persisted
+
+Issuing a create command is not proof it succeeded. After binding the schema and
+encoding, confirm both are populated before moving on:
+
+    gcloud pubsub topics describe <topic> \
+      --format="value(schemaSettings.schema, schemaSettings.encoding)"
+
+Do not proceed until that returns both a schema path and `JSON`. Apply the same
+describe-and-check pattern after creating the dead-letter policy.
+
 ## Dead-letter topics: the policy lives on the consuming subscription
 
-A dead-letter policy is configured on the **subscription that pulls from the main
-topic**, not on the dead-letter topic and not on a subscription of the
-dead-letter topic. Two mistakes account for almost every failure here: attaching
-the policy to the wrong subscription, and forgetting `--max-delivery-attempts`.
+Attach the dead-letter policy to the subscription that pulls from the SOURCE
+topic, not to the dead-letter topic or a subscription of it. `--max-delivery-attempts`
+is required (range 5–100); without it there is no dead-lettering.
 
-To dead-letter after N failed deliveries:
+    gcloud pubsub subscriptions update <sub> \
+      --dead-letter-topic=<dlq-topic> --max-delivery-attempts=5
 
-```bash
-DLQ_TOPIC="orders-dlq"
-SUB="orders-sub"          # the subscription that consumes the MAIN topic
-PROJECT="$(gcloud config get-value project)"
+    # verify it landed on the right subscription:
+    gcloud pubsub subscriptions describe <sub> \
+      --format="value(deadLetterPolicy.deadLetterTopic, deadLetterPolicy.maxDeliveryAttempts)"
 
-# 1. Create the dead-letter topic.
-gcloud pubsub topics create "$DLQ_TOPIC" --project="$PROJECT"
-
-# 2. Attach the dead-letter policy to the CONSUMING subscription.
-#    --max-delivery-attempts is required; without it there is no dead-lettering.
-gcloud pubsub subscriptions update "$SUB" \
-  --project="$PROJECT" \
-  --dead-letter-topic="$DLQ_TOPIC" \
-  --max-delivery-attempts=5
-
-# 3. Verify the policy is on the right subscription.
-gcloud pubsub subscriptions describe "$SUB" \
-  --project="$PROJECT" \
-  --format="value(deadLetterPolicy.deadLetterTopic, deadLetterPolicy.maxDeliveryAttempts)"
-```
-
-> **Grant the Pub/Sub service agent IAM, or dead-lettering silently fails.** The
-> service agent `service-<project-number>@gcp-sa-pubsub.iam.gserviceaccount.com`
-> needs `roles/pubsub.publisher` on the dead-letter topic and
-> `roles/pubsub.subscriber` on the subscription. Without these, messages are
-> never forwarded to the DLQ even though the policy looks correct.
-
-### Common mistakes
-
-- **Policy on the wrong subscription.** It must be on the subscription consuming
-  the source topic. A dead-letter policy attached to a subscription of the
-  dead-letter topic does nothing useful.
-- **`--max-delivery-attempts` omitted.** The valid range is 5 to 100. If a task
-  asks for "exactly N attempts," pass that N explicitly.
-
-## Build order: schema and encoding must exist before the topic binds them
-
-Most "topic create failed" loops come from doing things out of order. Pub/Sub
-will reject a topic create that references a schema that does not exist yet, and
-you cannot add JSON encoding without an attached schema. Follow this sequence and
-verify each step before moving on:
-
-1. **Create the schema first.** `gcloud pubsub schemas create <schema> --type=AVRO --definition=...`
-   Verify: `gcloud pubsub schemas describe <schema>` succeeds.
-2. **Create the topic bound to that schema, with JSON encoding.**
-   `gcloud pubsub topics create <topic> --schema=<schema> --message-encoding=json`
-   Verify: `gcloud pubsub topics describe <topic> --format="value(schemaSettings.encoding)"` returns `JSON`.
-3. **Create the dead-letter topic** before any subscription references it.
-4. **Create the consuming subscription, then attach the dead-letter policy** to
-   that subscription: `--dead-letter-topic=<dlq> --max-delivery-attempts=5`.
-   Verify the policy is on the subscription that consumes the *source* topic.
-5. **Grant the Pub/Sub service agent IAM permissions:**
-   - `roles/pubsub.publisher` on the dead-letter topic.
-   - `roles/pubsub.subscriber` on the consuming subscription.
-   *(Note: Without these roles, dead-lettering will silently fail even if the policy is configured).*
-
-If a `topics create` call fails, do not blindly retry the same command. Read the
-error: a missing-schema or wrong-encoding error means step 1 or 2 was skipped or
-out of order. Re-running an identical create that already failed will keep
-failing.
+Also grant the Pub/Sub service agent `roles/pubsub.publisher` on the dead-letter
+topic and `roles/pubsub.subscriber` on the subscription, or dead-lettering
+silently never fires.
 
 ## Creating topics and subscriptions
 All commands below use placeholders in CAPS. Replace `TOPIC_ID`,
